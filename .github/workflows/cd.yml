@@ -89,40 +89,54 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: publish-images
-    if: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_SSH_KEY != '' }}
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      MONGO_URI: ${{ secrets.MONGO_URI }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      CLIENT_ORIGIN: ${{ secrets.CLIENT_ORIGIN }}
+      SERVER_ID: ${{ secrets.SERVER_ID }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Skip deploy when secrets are missing
+        if: ${{ env.DEPLOY_HOST == '' || env.DEPLOY_USER == '' || env.DEPLOY_SSH_KEY == '' }}
+        run: echo "Deployment secrets are not configured. Skipping remote deployment."
+
       - name: Prepare deployment environment file
+        if: ${{ env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_SSH_KEY != '' }}
         run: |
           cat <<EOF > deploy.env
           SERVER_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-server:latest
           CLIENT_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-client:latest
           AGENT_IMAGE=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-agent:latest
-          MONGO_URI=${{ secrets.MONGO_URI }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          CLIENT_ORIGIN=${{ secrets.CLIENT_ORIGIN }}
-          SERVER_ID=${{ secrets.SERVER_ID }}
+          MONGO_URI=${{ env.MONGO_URI }}
+          JWT_SECRET=${{ env.JWT_SECRET }}
+          CLIENT_ORIGIN=${{ env.CLIENT_ORIGIN }}
+          SERVER_ID=${{ env.SERVER_ID }}
           BACKEND_URL=http://server:5000
           EOF
 
       - name: Copy compose bundle to target host
+        if: ${{ env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_SSH_KEY != '' }}
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_SSH_KEY }}
           source: docker-compose.yml,monitoring,deploy.env
           target: /opt/network-monitoring-system
 
       - name: Pull and restart services on target host
+        if: ${{ env.DEPLOY_HOST != '' && env.DEPLOY_USER != '' && env.DEPLOY_SSH_KEY != '' }}
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_SSH_KEY }}
           script: |
             cd /opt/network-monitoring-system
             mv deploy.env .env

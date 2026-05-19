@@ -1,0 +1,103 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: nms-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+  server:
+    build:
+      context: ./server
+    image: ${SERVER_IMAGE:-network-monitoring-system-server:local}
+    container_name: nms-server
+    depends_on:
+      - mongo
+    environment:
+      PORT: 5000
+      MONGO_URI: ${MONGO_URI:-mongodb://mongo:27017/network_monitoring_system}
+      JWT_SECRET: ${JWT_SECRET:-change-me}
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:-http://localhost}
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:5000/').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  client:
+    build:
+      context: ./client
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_SOCKET_URL: ""
+    image: ${CLIENT_IMAGE:-network-monitoring-system-client:local}
+    container_name: nms-client
+    depends_on:
+      - server
+    ports:
+      - "80:80"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1/ || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 15s
+
+  agent:
+    build:
+      context: ./agent
+    image: ${AGENT_IMAGE:-network-monitoring-system-agent:local}
+    container_name: nms-agent
+    depends_on:
+      - server
+    environment:
+      BACKEND_URL: ${BACKEND_URL:-http://server:5000}
+      SERVER_ID: ${SERVER_ID:-}
+    profiles:
+      - agent
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: nms-prometheus
+    depends_on:
+      - server
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.docker.yml:/etc/prometheus/prometheus.yml:ro
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: nms-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards/json:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    restart: unless-stopped
+
+volumes:
+  mongo-data:

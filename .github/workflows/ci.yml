@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+            agent/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci
+        working-directory: client
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Install agent dependencies
+        run: npm ci
+        working-directory: agent
+
+      - name: Lint client
+        run: npm run lint
+        working-directory: client
+
+      - name: Build client
+        run: npm run build
+        working-directory: client
+
+      - name: Syntax check server
+        run: |
+          node --check server.js
+          node --check controllers/authController.js
+          node --check controllers/metricsController.js
+          node --check controllers/serverController.js
+          node --check services/heartbeatMonitor.js
+          node --check services/prometheusMetrics.js
+        working-directory: server
+
+      - name: Syntax check agent
+        run: node --check agent.js
+        working-directory: agent
+
+      - name: Validate Docker Compose
+        run: docker compose config

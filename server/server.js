@@ -14,6 +14,7 @@ const serverRoutes = require("./routes/serverRoutes");
 const metricsRoutes = require("./routes/metricsRoutes");
 const alertRoutes = require("./routes/alertRoutes");
 const { startHeartbeatMonitor } = require("./services/heartbeatMonitor");
+const { prometheusMetricsHandler } = require("./services/prometheusMetrics");
 
 const app = express();
 
@@ -21,7 +22,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: process.env.CLIENT_ORIGIN || "*",
   },
 });
 
@@ -35,9 +36,16 @@ app.use("/api/auth", authRoutes);
 app.use("/api/servers", serverRoutes);
 app.use("/api/metrics", metricsRoutes);
 app.use("/api/alerts", alertRoutes);
+app.get("/metrics", prometheusMetricsHandler);
 
 app.get("/", (req, res) => {
   res.send("Backend Running");
+});
+
+app.get("/healthz", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+  });
 });
 
 io.on("connection", (socket) => {

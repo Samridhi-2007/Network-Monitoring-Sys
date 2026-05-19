@@ -34,8 +34,7 @@ import {
 } from "react-icons/fi";
 
 import socket from "../socket/socket";
-
-const API_BASE_URL = "http://localhost:5000/api";
+import { API_BASE_URL } from "../config";
 const METRICS_HISTORY_LIMIT = 24;
 const ALERT_HISTORY_LIMIT = 10;
 const DEMO_TICK_MS = 1800;

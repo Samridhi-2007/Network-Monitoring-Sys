@@ -17,7 +17,7 @@ const createOfflineAlertIfNeeded = async ({ server }) => {
     existingActiveAlert.currentValue = HEARTBEAT_TIMEOUT_MS / 1000;
     await existingActiveAlert.save();
 
-    return {
+    return { 
       alert: existingActiveAlert,
       isNew: false,
     };

@@ -9,7 +9,9 @@ const escapeLabelValue = (value) =>
     .replace(/"/g, '\\"');
 
 const metricLine = (name, value, labels = {}) => {
-  const labelEntries = Object.entries(labels).filter(([, labelValue]) => labelValue !== undefined);
+  const labelEntries = Object.entries(labels).filter(
+    ([, labelValue]) => labelValue !== undefined,
+  );
   const serializedLabels = labelEntries.length
     ? `{${labelEntries
         .map(([key, labelValue]) => `${key}="${escapeLabelValue(labelValue)}"`)
@@ -38,12 +40,13 @@ const buildLatestMetricsByServer = async () => {
 };
 
 const renderPrometheusMetrics = async () => {
-  const [servers, latestMetricsByServer, activeAlerts, totalMetrics] = await Promise.all([
-    Server.find().lean(),
-    buildLatestMetricsByServer(),
-    Alert.find({ status: "active" }).lean(),
-    Metrics.countDocuments(),
-  ]);
+  const [servers, latestMetricsByServer, activeAlerts, totalMetrics] =
+    await Promise.all([
+      Server.find().lean(),
+      buildLatestMetricsByServer(),
+      Alert.find({ status: "active" }).lean(),
+      Metrics.countDocuments(),
+    ]);
 
   const nowInSeconds = Date.now() / 1000;
   const lines = [
@@ -71,11 +74,18 @@ const renderPrometheusMetrics = async () => {
   }
 
   if (alertCounts.size === 0) {
-    lines.push(metricLine("nms_active_alerts_total", 0, { severity: "none", type: "none" }));
+    lines.push(
+      metricLine("nms_active_alerts_total", 0, {
+        severity: "none",
+        type: "none",
+      }),
+    );
   } else {
     for (const [key, count] of alertCounts.entries()) {
       const [severity, type] = key.split(":");
-      lines.push(metricLine("nms_active_alerts_total", count, { severity, type }));
+      lines.push(
+        metricLine("nms_active_alerts_total", count, { severity, type }),
+      );
     }
   }
 
@@ -105,20 +115,32 @@ const renderPrometheusMetrics = async () => {
       ip_address: server.ipAddress,
     };
     const latest = latestMetricsByServer.get(String(server._id));
-    const lastMetricsAtMs = latest?.createdAt ? new Date(latest.createdAt).getTime() : 0;
+    const lastMetricsAtMs = latest?.createdAt
+      ? new Date(latest.createdAt).getTime()
+      : 0;
 
-    lines.push(metricLine("nms_server_online_status", server.status === "online" ? 1 : 0, labels));
+    lines.push(
+      metricLine(
+        "nms_server_online_status",
+        server.status === "online" ? 1 : 0,
+        labels,
+      ),
+    );
     lines.push(
       metricLine(
         "nms_server_last_heartbeat_timestamp_seconds",
-        server.lastHeartbeatAt ? new Date(server.lastHeartbeatAt).getTime() / 1000 : 0,
+        server.lastHeartbeatAt
+          ? new Date(server.lastHeartbeatAt).getTime() / 1000
+          : 0,
         labels,
       ),
     );
     lines.push(
       metricLine(
         "nms_server_last_metrics_timestamp_seconds",
-        server.lastMetricsAt ? new Date(server.lastMetricsAt).getTime() / 1000 : 0,
+        server.lastMetricsAt
+          ? new Date(server.lastMetricsAt).getTime() / 1000
+          : 0,
         labels,
       ),
     );
@@ -129,10 +151,26 @@ const renderPrometheusMetrics = async () => {
         labels,
       ),
     );
-    lines.push(metricLine("nms_server_cpu_usage_percent", latest?.cpuUsage ?? 0, labels));
-    lines.push(metricLine("nms_server_memory_usage_percent", latest?.memoryUsage ?? 0, labels));
-    lines.push(metricLine("nms_server_disk_usage_percent", latest?.diskUsage ?? 0, labels));
-    lines.push(metricLine("nms_server_uptime_seconds", latest?.uptime ?? 0, labels));
+    lines.push(
+      metricLine("nms_server_cpu_usage_percent", latest?.cpuUsage ?? 0, labels),
+    );
+    lines.push(
+      metricLine(
+        "nms_server_memory_usage_percent",
+        latest?.memoryUsage ?? 0,
+        labels,
+      ),
+    );
+    lines.push(
+      metricLine(
+        "nms_server_disk_usage_percent",
+        latest?.diskUsage ?? 0,
+        labels,
+      ),
+    );
+    lines.push(
+      metricLine("nms_server_uptime_seconds", latest?.uptime ?? 0, labels),
+    );
   }
 
   return `${lines.join("\n")}\n`;
